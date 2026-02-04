@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProjectStatus {
+  OPORTUNIDAD
+  COTIZACION_ENVIADA
+  EN_NEGOCIACION
+  VENDIDO
+  FACTURADO
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+
+  projects  Project[] @relation("SellerProjects")
+  logs      ProjectLog[]
+}
+
+model Project {
+  id           String        @id @default(uuid())
+  name         String
+  client       String
+  sellerId     String
+  seller       User          @relation("SellerProjects", fields: [sellerId], references: [id])
+  businessType String
+  estimatedValue Decimal     @db.Decimal(14,2)
+  status       ProjectStatus @default(OPORTUNIDAD)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  logs         ProjectLog[]
+}
+
+model ProjectLog {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  date        DateTime @default(now())
+  description String
+  sellerId    String
+  seller      User     @relation(fields: [sellerId], references: [id])
+}
