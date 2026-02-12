@@ -12,31 +12,37 @@ function getJwtSecret() {
 }
 
 export async function register(req: Request, res: Response) {
-  const { name, email, password } = req.body ?? {};
+  try {
+    const { name, email, password } = req.body ?? {};
 
-  if (!name || !email || !password) {
-    return res
-      .status(400)
-      .json({ message: "name, email y password son requeridos" });
+    if (!name || !email || !password) {
+      return res
+        .status(400)
+        .json({ message: "name, email y password son requeridos" });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(409).json({ message: "El correo ya está registrado" });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        roleId: "7d6850ba-ddb8-45bf-a58b-a6bea14cf7ee",
+        password: hashed,
+      },
+      select: { id: true, name: true, email: true, createdAt: true },
+    });
+    console.log("user", user);
+    return res.status(201).json({ user });
+  } catch (error) {
+    console.error("Error en register:", error);
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
-
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return res.status(409).json({ message: "El correo ya está registrado" });
-  }
-
-  const hashed = await bcrypt.hash(password, 10);
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      password: hashed,
-    },
-    select: { id: true, name: true, email: true, createdAt: true },
-  });
-
-  return res.status(201).json({ user });
 }
 
 export async function login(

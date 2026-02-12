@@ -7,12 +7,14 @@ datasource db {
   provider = "postgresql"
 }
 
-enum ProjectStatus {
-  OPORTUNIDAD
-  COTIZACION_ENVIADA
-  EN_NEGOCIACION
-  VENDIDO
-  FACTURADO
+model Role {
+  id          String   @id @default(uuid())
+  code        String   @unique // "ADMIN", "VENDEDOR"
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  users User[]
 }
 
 model User {
@@ -22,31 +24,102 @@ model User {
   password  String
   createdAt DateTime @default(now())
 
-  projects  Project[] @relation("SellerProjects")
-  logs      ProjectLog[]
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  // Relación como vendedor en proyectos
+  sellerProjects  Project[]        @relation("SellerProjects")
+  negotiationLogs NegotiationLog[]
+}
+
+model DocumentType {
+  id          String   @id @default(uuid())
+  code        String   @unique // "CC", "NIT", etc.
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  clients Client[]
+}
+
+model Client {
+  id             String       @id @default(uuid())
+  name           String // Nombre o razón social
+  documentTypeId String
+  documentType   DocumentType @relation(fields: [documentTypeId], references: [id])
+  documentNumber String
+  createdAt      DateTime     @default(now())
+
+  projects     Project[]
+  negotiations Negotiation[]
+
+  @@unique([documentTypeId, documentNumber])
+}
+
+model BusinessType {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  projects Project[]
+}
+
+model ProjectStatus {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  generaBitacora Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  projects Project[]
 }
 
 model Project {
-  id           String        @id @default(uuid())
-  name         String
-  client       String
-  sellerId     String
-  seller       User          @relation("SellerProjects", fields: [sellerId], references: [id])
-  businessType String
-  estimatedValue Decimal     @db.Decimal(14,2)
-  status       ProjectStatus @default(OPORTUNIDAD)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id       String @id @default(uuid())
+  name     String // "Proyecto"
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
 
-  logs         ProjectLog[]
+  sellerId String
+  seller   User   @relation("SellerProjects", fields: [sellerId], references: [id])
+
+  businessTypeId String
+  businessType   BusinessType @relation(fields: [businessTypeId], references: [id])
+
+  estimatedValue Decimal @db.Decimal(14, 2)
+
+  statusId String
+  status   ProjectStatus @relation(fields: [statusId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  negotiation Negotiation?
 }
 
-model ProjectLog {
-  id          String   @id @default(uuid())
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id])
+model Negotiation {
+  id String @id @default(uuid())
+
+  projectId String  @unique
+  project   Project @relation(fields: [projectId], references: [id])
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  logs NegotiationLog[]
+}
+
+model NegotiationLog {
+  id            String      @id @default(uuid())
+  negotiationId String
+  negotiation   Negotiation @relation(fields: [negotiationId], references: [id])
+
   date        DateTime @default(now())
   description String
-  sellerId    String
-  seller      User     @relation(fields: [sellerId], references: [id])
+
+  sellerId String
+  seller   User   @relation(fields: [sellerId], references: [id])
 }
