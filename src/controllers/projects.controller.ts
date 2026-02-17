@@ -95,8 +95,9 @@ export async function getProjects(_req: Request, res: Response) {
 export async function createProject(req: AuthRequest, res: Response) {
   try {
     const body = (req.body ?? {}) as Record<string, unknown>;
-
-    const name = toNonEmptyString(body.name ?? body.project ?? body.projectName);
+    const name = toNonEmptyString(
+      body.name ?? body.project ?? body.projectName,
+    );
     const clientId = toNonEmptyString(body.clientId);
     const sellerId = toNonEmptyString(body.sellerId) ?? req.user?.id ?? null;
     const businessTypeId = toNonEmptyString(
@@ -109,35 +110,44 @@ export async function createProject(req: AuthRequest, res: Response) {
     let statusId = toNonEmptyString(body.statusId);
     if (!statusId) {
       const defaultStatus = await prisma.projectStatus.findFirst({
-        where: { name: { equals: "Oportunidad de venta", mode: "insensitive" } },
+        where: {
+          name: { equals: "Oportunidad de venta", mode: "insensitive" },
+        },
         select: { id: true },
       });
       statusId = defaultStatus?.id ?? null;
     }
 
-    if (
-      !name ||
-      !clientId ||
-      !sellerId ||
-      !businessTypeId ||
-      !statusId ||
-      !estimatedValue
-    ) {
+    const missingFields: string[] = [];
+
+    if (!name) missingFields.push("name/project");
+    if (!clientId) missingFields.push("clientId");
+    if (!sellerId) missingFields.push("sellerId");
+    if (!businessTypeId) missingFields.push("businessTypeId/typeId");
+    if (!statusId) missingFields.push("statusId");
+    if (!estimatedValue) missingFields.push("estimatedValue");
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
-        message:
-          "Campos requeridos: name/project, clientId, sellerId, businessTypeId/typeId, statusId (o estado por defecto), estimatedValue",
+        message: `Campos requeridos faltantes: ${missingFields.join(", ")}`,
       });
     }
 
     const [client, seller, businessType, status] = await Promise.all([
-      prisma.client.findUnique({ where: { id: clientId }, select: { id: true } }),
-      prisma.user.findUnique({ where: { id: sellerId }, select: { id: true } }),
+      prisma.client.findUnique({
+        where: { id: clientId! },
+        select: { id: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: sellerId! },
+        select: { id: true },
+      }),
       prisma.businessType.findUnique({
-        where: { id: businessTypeId },
+        where: { id: businessTypeId! },
         select: { id: true },
       }),
       prisma.projectStatus.findUnique({
-        where: { id: statusId },
+        where: { id: statusId! },
         select: { id: true },
       }),
     ]);
@@ -149,7 +159,9 @@ export async function createProject(req: AuthRequest, res: Response) {
       return res.status(404).json({ message: "Vendedor no encontrado" });
     }
     if (!businessType) {
-      return res.status(404).json({ message: "Tipo de proyecto no encontrado" });
+      return res
+        .status(404)
+        .json({ message: "Tipo de proyecto no encontrado" });
     }
     if (!status) {
       return res.status(404).json({ message: "Estado no encontrado" });
@@ -157,12 +169,12 @@ export async function createProject(req: AuthRequest, res: Response) {
 
     const project = await prisma.project.create({
       data: {
-        name,
+        name: name!,
         clientId: client.id,
         sellerId: seller.id,
         businessTypeId: businessType.id,
         statusId: status.id,
-        estimatedValue,
+        estimatedValue: estimatedValue!,
       },
       select: { id: true },
     });

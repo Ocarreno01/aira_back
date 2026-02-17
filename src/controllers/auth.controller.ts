@@ -37,7 +37,6 @@ export async function register(req: Request, res: Response) {
       },
       select: { id: true, name: true, email: true, createdAt: true },
     });
-    console.log("user", user);
     return res.status(201).json({ user });
   } catch (error) {
     console.error("Error en register:", error);
