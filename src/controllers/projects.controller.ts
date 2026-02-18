@@ -30,6 +30,22 @@ function normalizeEstimatedValue(value: unknown): string | null {
   return null;
 }
 
+function hasOwnKey(body: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(body, key);
+}
+
+function getFirstPresentValue(
+  body: Record<string, unknown>,
+  keys: string[],
+): unknown {
+  for (const key of keys) {
+    if (hasOwnKey(body, key)) {
+      return body[key];
+    }
+  }
+  return undefined;
+}
+
 export async function getProjects(_req: Request, res: Response) {
   try {
     const projects = await prisma.project.findMany({
@@ -186,6 +202,196 @@ export async function createProject(req: AuthRequest, res: Response) {
   }
 }
 
+export async function updateProject(req: AuthRequest, res: Response) {
+  try {
+    const projectId = toNonEmptyString(req.params.id);
+    if (!projectId) {
+      return res.status(400).json({ message: "id de proyecto inválido" });
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true },
+    });
+    if (!project) {
+      return res.status(404).json({ message: "Proyecto no encontrado" });
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const updateData: {
+      name?: string;
+      clientId?: string;
+      sellerId?: string;
+      businessTypeId?: string;
+      statusId?: string;
+      estimatedValue?: string;
+    } = {};
+
+    const nameRaw = getFirstPresentValue(body, [
+      "name",
+      "project",
+      "projectName",
+    ]);
+    if (nameRaw !== undefined) {
+      const name = toNonEmptyString(nameRaw);
+      if (!name) {
+        return res.status(400).json({ message: "name/project inválido" });
+      }
+      updateData.name = name;
+    }
+
+    if (hasOwnKey(body, "clientId")) {
+      const clientId = toNonEmptyString(body.clientId);
+      if (!clientId) {
+        return res.status(400).json({ message: "clientId inválido" });
+      }
+      const client = await prisma.client.findUnique({
+        where: { id: clientId },
+        select: { id: true },
+      });
+      if (!client) {
+        return res.status(404).json({ message: "Cliente no encontrado" });
+      }
+      updateData.clientId = client.id;
+    }
+
+    const sellerRaw = getFirstPresentValue(body, ["sellerId"]);
+    if (sellerRaw !== undefined) {
+      const sellerId = toNonEmptyString(sellerRaw) ?? req.user?.id ?? null;
+      if (!sellerId) {
+        return res.status(400).json({ message: "sellerId inválido" });
+      }
+      const seller = await prisma.user.findUnique({
+        where: { id: sellerId },
+        select: { id: true },
+      });
+      if (!seller) {
+        return res.status(404).json({ message: "Vendedor no encontrado" });
+      }
+      updateData.sellerId = seller.id;
+    }
+
+    const businessTypeRaw = getFirstPresentValue(body, [
+      "businessTypeId",
+      "typeId",
+      "projectTypeId",
+    ]);
+    if (businessTypeRaw !== undefined) {
+      const businessTypeId = toNonEmptyString(businessTypeRaw);
+      if (!businessTypeId) {
+        return res
+          .status(400)
+          .json({ message: "businessTypeId/typeId inválido" });
+      }
+      const businessType = await prisma.businessType.findUnique({
+        where: { id: businessTypeId },
+        select: { id: true },
+      });
+      if (!businessType) {
+        return res
+          .status(404)
+          .json({ message: "Tipo de proyecto no encontrado" });
+      }
+      updateData.businessTypeId = businessType.id;
+    }
+
+    const statusRaw = getFirstPresentValue(body, [
+      "statusId",
+      "projectStatusId",
+    ]);
+    if (statusRaw !== undefined) {
+      const statusId = toNonEmptyString(statusRaw);
+      if (!statusId) {
+        return res
+          .status(400)
+          .json({ message: "statusId/projectStatusId inválido" });
+      }
+      const status = await prisma.projectStatus.findUnique({
+        where: { id: statusId },
+        select: { id: true },
+      });
+      if (!status) {
+        return res.status(404).json({ message: "Estado no encontrado" });
+      }
+      updateData.statusId = status.id;
+    }
+
+    const estimatedValueRaw = getFirstPresentValue(body, [
+      "estimatedValue",
+      "value",
+    ]);
+    if (estimatedValueRaw !== undefined) {
+      const estimatedValue = normalizeEstimatedValue(estimatedValueRaw);
+      if (!estimatedValue) {
+        return res.status(400).json({ message: "estimatedValue inválido" });
+      }
+      updateData.estimatedValue = estimatedValue;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        message:
+          "No se enviaron campos para actualizar. Campos válidos: name/project, clientId, sellerId, businessTypeId/typeId/projectTypeId, statusId/projectStatusId, estimatedValue/value",
+      });
+    }
+    console.log("updateData", updateData);
+    const updatedProject = await prisma.project.update({
+      where: { id: projectId },
+      data: updateData,
+      select: { id: true },
+    });
+
+    return res.status(200).json({ id: updatedProject.id });
+  } catch (error) {
+    console.error("Error en updateProject:", error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+}
+
+export async function deleteProject(req: Request, res: Response) {
+  try {
+    const projectId = toNonEmptyString(req.params.id);
+    if (!projectId) {
+      return res.status(400).json({ message: "id de proyecto inválido" });
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        id: true,
+        negotiation: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: "Proyecto no encontrado" });
+    }
+
+    if (project.negotiation) {
+      return res.status(409).json({
+        message:
+          "No se puede eliminar el proyecto porque tiene una negociación asociada",
+      });
+    }
+
+    await prisma.project.delete({ where: { id: projectId } });
+    return res.status(204).send();
+  } catch (error) {
+    const prismaError = error as { code?: string };
+    if (prismaError.code === "P2003") {
+      return res.status(409).json({
+        message:
+          "No se puede eliminar el proyecto porque tiene registros relacionados",
+      });
+    }
+
+    console.error("Error en deleteProject:", error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+}
+
 export async function getClients(_req: Request, res: Response) {
   try {
     const clients = await prisma.client.findMany({
@@ -304,6 +510,42 @@ export async function getTypes(_req: Request, res: Response) {
     );
   } catch (error) {
     console.error("Error en getTypes:", error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+}
+
+export async function getNegotiationStatus(_req: Request, res: Response) {
+  try {
+    const status = await prisma.projectStatus.findFirst({
+      where: { generaBitacora: true },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        generaBitacora: true,
+        createdAt: true,
+      },
+    });
+
+    if (!status) {
+      return res.status(404).json({
+        message:
+          "No existe un estado de proyecto configurado para negociación (generaBitacora=true)",
+      });
+    }
+
+    return res.json({
+      id: status.id,
+      name: status.name,
+      label: status.name,
+      value: status.id,
+      description: status.description,
+      generaBitacora: status.generaBitacora,
+      createdAt: status.createdAt,
+    });
+  } catch (error) {
+    console.error("Error en getNegotiationStatus:", error);
     return res.status(500).json({ message: "Error interno del servidor" });
   }
 }
