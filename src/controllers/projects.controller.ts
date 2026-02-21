@@ -51,6 +51,11 @@ export async function getProjects(_req: Request, res: Response) {
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: "desc" },
       include: {
+        negotiation: {
+          select: {
+            id: true,
+          },
+        },
         client: {
           select: {
             id: true,
@@ -98,6 +103,7 @@ export async function getProjects(_req: Request, res: Response) {
         statusId: project.statusId,
         statusName: project.status.name,
         generaBitacora: project.status.generaBitacora,
+        negotiationId: project.negotiation?.id ?? null,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       })),
