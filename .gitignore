@@ -19,3 +19,5 @@ yarn-error.log*
 .env.*.local
 coverage/
 .nyc_output/
+skill.md
+skills-lock.json

@@ -60,7 +60,7 @@ export async function getNegotiations(_req: Request, res: Response) {
     });
 
     return res.json(
-      negotiations.map((negotiation) => ({
+      negotiations.map((negotiation: any) => ({
         id: negotiation.id,
         negotiationId: negotiation.id,
         createdAt: negotiation.createdAt,
@@ -75,7 +75,7 @@ export async function getNegotiations(_req: Request, res: Response) {
         documentTypeName: negotiation.client.documentType.name,
         documentNumber: negotiation.client.documentNumber,
         logsCount: negotiation.logs.length,
-        logs: negotiation.logs.map((log) => ({
+        logs: negotiation.logs.map((log: any) => ({
           id: log.id,
           date: log.date,
           description: log.description,
@@ -186,7 +186,7 @@ export async function getNegotiationById(req: Request, res: Response) {
         createdAt: negotiation.project.createdAt,
         updatedAt: negotiation.project.updatedAt,
       },
-      logs: negotiation.logs.map((log) => ({
+      logs: negotiation.logs.map((log: any) => ({
         id: log.id,
         date: log.date,
         description: log.description,
@@ -264,7 +264,7 @@ export async function createNegotiation(req: Request, res: Response) {
       });
     }
 
-    const created = await prisma.$transaction(async (tx) => {
+    const created = await prisma.$transaction(async (tx: any) => {
       const negotiation = await tx.negotiation.create({
         data: {
           projectId: project.id,

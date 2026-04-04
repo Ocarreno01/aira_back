@@ -86,7 +86,7 @@ export async function getProjects(_req: Request, res: Response) {
     });
 
     return res.json(
-      projects.map((project) => ({
+      projects.map((project: any) => ({
         id: project.id,
         name: project.name,
         project: project.name,
@@ -416,7 +416,7 @@ export async function getClients(_req: Request, res: Response) {
     });
 
     return res.json(
-      clients.map((client) => ({
+      clients.map((client: any) => ({
         id: client.id,
         name: client.name,
         label: client.name,
@@ -456,7 +456,7 @@ export async function getSellers(_req: Request, res: Response) {
     }
 
     return res.json(
-      sellers.map((seller) => ({
+      sellers.map((seller: any) => ({
         id: seller.id,
         name: seller.name,
         label: seller.name,
@@ -482,7 +482,7 @@ export async function getStatuses(_req: Request, res: Response) {
     });
 
     return res.json(
-      statuses.map((status) => ({
+      statuses.map((status: any) => ({
         id: status.id,
         name: status.name,
         label: status.name,
@@ -507,7 +507,7 @@ export async function getTypes(_req: Request, res: Response) {
     });
 
     return res.json(
-      types.map((type) => ({
+      types.map((type: any) => ({
         id: type.id,
         name: type.name,
         label: type.name,
